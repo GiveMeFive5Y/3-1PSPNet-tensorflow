@@ -8,7 +8,7 @@ import cv2
 import os
 
 
-def dice_loss_with_CE(beta=1, smooth = 1e-5):
+def dice_loss_with_CE(beta=1, smooth=1e-5):
     def _dice_loss_with_CE(y_true, y_pred):
         y_pred = K.clip(y_pred, K.epsilon(), 1.0 - K.epsilon())
 
@@ -46,7 +46,11 @@ def read_label_image_list(data_dir, data_list):
     f = open(data_list, 'r')
     images = []
     masks = []
+    lines = []
     for line in f:
+        lines.append(line)
+    shuffle(lines)
+    for line in lines:
         try:
             image, mask = line[:-1].split(' ')
         except ValueError:
@@ -62,7 +66,6 @@ def read_label_image_list(data_dir, data_list):
 
         images.append(image)
         masks.append(mask)
-
     return images, masks
 
 
@@ -125,7 +128,7 @@ def random_crop_and_pad_image_and_labels(image, label, crop_h, crop_w, ignore_la
 
 
 class Generator(object):
-    def __init__(self, data_dir, data_list, batch_size, input_size, ignore_label, img_mean, aux_branch, image_lines,num_classes):
+    def __init__(self, data_dir, data_list, batch_size, input_size, ignore_label, img_mean, aux_branch, num_classes):
         self.data_dir = data_dir
         self.data_list = data_list
         self.input_size = input_size
@@ -133,7 +136,6 @@ class Generator(object):
         self.ignore_label = ignore_label
         self.batch_size = batch_size
         self.aux_branch = aux_branch
-        self.lines = image_lines
         self.num_classes = num_classes
         self.image_list, self.label_list = read_label_image_list(self.data_dir, self.data_list)
 
@@ -173,7 +175,6 @@ class Generator(object):
         image = new_image
         label = new_label
 
-
         # distort image
         hue = rand(-hue, hue)
         sat = rand(1, sat) if rand()<.5 else 1/rand(1, sat)
@@ -192,7 +193,7 @@ class Generator(object):
 
     def generate(self,random_data=True):
         i = 0
-        length = self.lines
+        length = len(self.image_list)
         inputs = []
         targets = []
         h = self.input_size[0]
@@ -225,12 +226,9 @@ class Generator(object):
             #     L.append(value)
             #
             # label = np.float32(L)
-            # print('==========================',np.array(label).shape)
 
             png = np.array(label)
-            png = png - 255
-            # png[png >= self.num_classes] = self.num_classes
-            png[png < self.num_classes] = self.num_classes
+            png[png >= self.num_classes] = self.num_classes
             seg_labels = np.eye(self.num_classes+1)[png.reshape([-1])]
             label = seg_labels.reshape((int(w),int(h),self.num_classes+1))
             inputs.append(np.array(img)/255)
